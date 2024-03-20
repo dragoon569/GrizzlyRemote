@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote Control</title>
+    <link rel="stylesheet" href="../Web/node_modules/halfmoon/css/halfmoon.min.css">
+    <link rel="stylesheet" href="../Web/controlAppCSS.css">
+</head>
+<body>
+    <div class="remote-control">
+        <div class="virtual-keyboard">
+            <!-- Virtual keyboard buttons -->
+            <button class="keyboard-btn">A</button>
+            <button class="keyboard-btn">B</button>
+            <!-- Add the rest of your buttons here -->
+        </div>
+        <div class="power-controls">
+            <!-- Power control buttons -->
+            <button id="screen-off-btn" class="btn btn-orange mt-3">Turn Screen Off</button>
+            <button id="shutdown-btn" class="btn btn-red mt-3">Shutdown</button>
+        </div>
+        <div class="volume-controls">
+            <!-- Volume slider -->
+            <div class="mt-3 position-relative">
+                <label for="volume-slider">Volume</label>
+                <div class="volume-slider-container d-flex align-items-center">
+                    <button class="btn btn-secondary me-2" id="volume-down-5-btn">Volume Down</button>
+                    <input type="range" class="form-range volume-slider-thumb flex-grow-1" id="volume-slider" min="0" max="100" value="50">
+                    <button class="btn btn-secondary me-2" id="volume-up-5-btn">Volume Up</button>
+                    <!-- Moved the toggle-mute-btn here, under the volume up button -->
+                    <div class="toggle-mute-btn mt-2">
+                        <button class="btn btn-blue" id="mute-unmute-btn"></button>
+                    </div>
+                </div>
+                <div class="volume-percentage text-end mt-2" id="volume-percentage"></div>
+            </div>
+        </div>
+
+        <!-- Display Grizzly remote information -->
+        <div class="grizzly-info-container mt-5">
+            <h2>Discovered Grizzly Remote</h2>
+            <div class="grizzly-info-button">
+                <p><strong>Bear Name:</strong> <span id="bear-name"></span></p>
+                <p><strong>Device Name:</strong> <span id="device-name"></span></p>
+                <p><strong>Device Type:</strong> <span id="device-type"></span></p>
+                <p><strong>Local IP:</strong> <span id="local-ip"></span></p>
+            </div>
+        </div>
+
+    <footer>© 2024 Remote Control App</footer>
+    <script src="../Web/controlAppJS.js"></script>
+</body>
+</html>
