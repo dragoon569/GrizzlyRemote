@@ -134,7 +134,7 @@ document.getElementById('mute-unmute-btn').addEventListener('click', function() 
         .then(response => response.json())
         .then(data => {
             // Update the HTML elements with the fetched information
-            document.getElementById("bear-name").textContent = data.bear_name;
+            document.getElementById("bear-name").textContent = data.BEAR_NAME;
             document.getElementById("device-name").textContent = data.device_name;
             document.getElementById("device-type").textContent = data.device_type;
             document.getElementById("local-ip").textContent = data.local_ip;

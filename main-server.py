@@ -10,6 +10,7 @@ from comtypes import CLSCTX_ALL
 from ctypes import cast, POINTER
 from flask_httpauth import HTTPBasicAuth
 from zeroconf import IPVersion, ServiceInfo, Zeroconf, ServiceBrowser
+
 app = Flask(__name__, 
             template_folder=os.path.join(os.path.dirname(__file__), 'Web'),
             static_folder=os.path.join(os.path.dirname(__file__), 'Web'))
@@ -23,9 +24,13 @@ volume_control = None
 
 def get_bear_name():
     global BEAR_NAME
-    BEAR_NAME = input("Name your Bear: ")
-    with open(CONFIG_FILE, "w") as f:
-        f.write(f"{BEAR_NAME}\n")
+    bear_name = read_config()[0]  # Read bear name from config file
+    if bear_name:
+        BEAR_NAME = bear_name
+    else:
+        BEAR_NAME = input("Name your Bear: ")
+        with open(CONFIG_FILE, "w") as f:
+            f.write(f"{BEAR_NAME}\n")
 
 def get_username_password():
     username = input("Enter username: ")
@@ -34,6 +39,8 @@ def get_username_password():
         f.write(f"{username}:{password}\n")
 
 def read_config():
+    if not os.path.exists(CONFIG_FILE):
+        return None, None, None
     with open(CONFIG_FILE, "r") as f:
         lines = f.readlines()
         bear_name = lines[0].strip()
@@ -172,8 +179,6 @@ def on_service_state_change(zeroconf, service_type, name, state_change):
             # Save the discovered services to the JSON file
             save_discovered_services(discovered_services)
 
-
-
 # Create a Zeroconf instance   
 zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
 
@@ -199,7 +204,6 @@ save_discovered_services(discovered_services)
 
 # Load the discovered services
 loaded_services = load_discovered_services()
-print(loaded_services)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

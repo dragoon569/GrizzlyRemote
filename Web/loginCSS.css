@@ -67,3 +67,11 @@ span.psw {
   overflow-y: auto; /* Enable vertical scrolling */
   margin-top: 20px; /* Add some margin for spacing */
 }
+
+
+.device-details {
+  background-color: #107952;  /* Change the background color of the dropdown */
+  border-radius: 4px; /* Add some border radius for a sleek look */
+  padding: 10px; /* Add padding for better spacing */
+  margin-top: 5px; /* Add margin to separate the button and the dropdown */
+}

@@ -38,38 +38,69 @@
 </form>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    // Function to fetch and update Grizzly remote information
-    function updateGrizzlyInfo() {
-        fetch("/fetch_grizzly_info") // Fetch the Grizzly remote information from the server
-        .then(response => response.json())
-        .then(data => {
-            // Update the HTML elements with the fetched information
-            const deviceContainer = document.querySelector('.device-container');
-
-            // Clear existing content
-            deviceContainer.innerHTML = '';
-
-            // Create buttons for each device
-            data.forEach(device => {
-                const button = document.createElement('button');
-                button.textContent = `${device.device_name} (${device.device_type})`;
-                button.addEventListener('click', () => {
-                    // You can define what happens when a button is clicked here
-                    console.log(`Clicked on ${device.device_name}`);
-                });
-                deviceContainer.appendChild(button);
-            });
-        })
-        .catch(error => {
-            console.error("Error fetching Grizzly remote information:", error);
-        });
-    }
-
-    // Call updateGrizzlyInfo function when the page loads
-    updateGrizzlyInfo();
-});
-</script>
+  document.addEventListener("DOMContentLoaded", function () {
+      // Function to fetch and update Grizzly remote information
+      function updateGrizzlyInfo() {
+          fetch("/fetch_grizzly_info") // Fetch the Grizzly remote information from the server
+          .then(response => response.json())
+          .then(data => {
+              // Update the HTML elements with the fetched information
+              const deviceContainer = document.querySelector('.device-container');
+              deviceContainer.innerHTML = ''; // Clear existing content
+  
+              // Check if data is an object
+              if (typeof data === 'object' && data !== null) {
+                  // Create a button for each device
+                  const button = createButton(data);
+                  deviceContainer.appendChild(button);
+              } else {
+                  console.error("Data is not an object:", data);
+              }
+          })
+          .catch(error => {
+              console.error("Error fetching Grizzly remote information:", error);
+          });
+      }
+  
+      // Function to create a button for a device
+      function createButton(device) {
+          const button = document.createElement('button');
+          button.textContent = `${device.bear_name} (${device.device_type})`;
+          button.classList.add('device-button');
+  
+          // Create a div for device details
+          const detailsDiv = document.createElement('div');
+          detailsDiv.classList.add('device-details');
+  
+          // Add device name and local IP address to detailsDiv
+          const deviceName = document.createElement('p');
+          deviceName.textContent = `Device Name: ${device.device_name}`;
+          detailsDiv.appendChild(deviceName);
+  
+          const localIP = document.createElement('p');
+          localIP.textContent = `Local IP: ${device.local_ip}`;
+          detailsDiv.appendChild(localIP);
+  
+          // Hide detailsDiv initially
+          detailsDiv.style.display = 'none';
+  
+          // Append detailsDiv after the button
+          button.appendChild(detailsDiv);
+  
+          // Add click event listener to toggle the display of additional information
+          button.addEventListener('click', function() {
+              // Toggle the display of the device details
+              detailsDiv.style.display = detailsDiv.style.display === 'none' ? 'block' : 'none';
+          });
+  
+          return button;
+      }
+  
+      // Call updateGrizzlyInfo function when the page loads
+      updateGrizzlyInfo();
+  });
+  </script>
+  
 
 </body>
 </html>
