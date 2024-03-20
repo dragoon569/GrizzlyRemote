@@ -2,8 +2,10 @@ import os
 import ctypes
 import socket
 import json
-import platform  
+import subprocess
+import platform
 import re
+import threading
 from flask import Flask, request, render_template, jsonify, redirect, url_for, session
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from comtypes import CLSCTX_ALL
@@ -11,7 +13,7 @@ from ctypes import cast, POINTER
 from flask_httpauth import HTTPBasicAuth
 from zeroconf import IPVersion, ServiceInfo, Zeroconf, ServiceBrowser
 
-app = Flask(__name__, 
+app = Flask(__name__,
             template_folder=os.path.join(os.path.dirname(__file__), 'Web'),
             static_folder=os.path.join(os.path.dirname(__file__), 'Web'))
 app.secret_key = os.urandom(24)  # Secret key for session management
@@ -20,7 +22,9 @@ auth = HTTPBasicAuth()
 CONFIG_FILE = "config.txt"
 SERVICE_TYPE = "_grizzlyremote._tcp.local."
 BEAR_NAME = ""
-volume_control = None  
+volume_control = None
+discovered_peers = []  # List to store discovered peers' information
+
 
 def get_bear_name():
     global BEAR_NAME
@@ -141,7 +145,6 @@ def advertise_service(zc, port):
                        properties=desc)
     zc.register_service(info)
 
-
 def browse_services(zc):
     class ServiceListener:
         def __init__(self):
@@ -154,6 +157,7 @@ def browse_services(zc):
             info = zc.get_service_info(type, name)
             if info:
                 print(f"Discovered service: {name} - {info.addresses[0]}")
+                discovered_peers.append({"name": name, "address": socket.inet_ntoa(info.addresses[0])})
 
         def update_service(self, zc, type, name):
             pass
@@ -161,49 +165,34 @@ def browse_services(zc):
     listener = ServiceListener()
     browser = ServiceBrowser(zc, SERVICE_TYPE, listener)
 
-# Create an empty list to store discovered services
-discovered_services = []
+def handle_discovery(zc):
+    advertise_service(zc, 5000)  # Advertise own service
+    browse_services(zc)  # Browse for other services
 
-# Define a callback function to handle discovered services
-def on_service_state_change(zeroconf, service_type, name, state_change):
-    if state_change == 'added':
-        info = zeroconf.get_service_info(service_type, name)
-        if info:
-            # Extract the bear name and IP address from the service info
-            bear_name = info.properties.get(b'bear_name', b'Unknown').decode("utf-8")
-            address = socket.inet_ntoa(info.addresses[0])
+def establish_peer_connections():
+    for peer in discovered_peers:
+        try:
+            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            peer_socket.connect((peer["address"], 5000))  # Connect to peer's service port
+            # Exchange some dummy data with the peer
+            message = "Hello from Grizzly Remote!"
+            peer_socket.sendall(message.encode())
+            response = peer_socket.recv(1024)
+            print(f"Received response from {peer['name']}: {response.decode()}")
+        except Exception as e:
+            print(f"Error connecting to {peer['name']}: {e}")
+        finally:
+            peer_socket.close()
 
-            # Append the discovered service to the list
-            discovered_services.append({"bear_name": bear_name, "address": address})
+# Thread for handling service discovery and peer connections
+def discovery_and_connection_thread():
+    zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
+    handle_discovery(zeroconf)  # Perform service discovery
+    establish_peer_connections()  # Establish peer connections
 
-            # Save the discovered services to the JSON file
-            save_discovered_services(discovered_services)
-
-# Create a Zeroconf instance   
-zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
-
-# Start browsing for services of type _grizzlyremote._tcp.local.
-browser = ServiceBrowser(zeroconf, SERVICE_TYPE, handlers=[on_service_state_change])
-
-# Function to save discovered services to a JSON file
-def save_discovered_services(discovered_services):
-    with open('discovered_services.json', 'w') as f:
-        json.dump(discovered_services, f)
-
-# Function to load discovered services from a JSON file
-def load_discovered_services():
-    try:
-        with open('discovered_services.json', 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
-
-# Example usage:
-# Save the discovered services
-save_discovered_services(discovered_services)
-
-# Load the discovered services
-loaded_services = load_discovered_services()
+# Start the discovery and connection thread
+discovery_thread = threading.Thread(target=discovery_and_connection_thread)
+discovery_thread.start()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -295,9 +284,5 @@ if __name__ == "__main__":
     import comtypes
     comtypes.CoInitialize()  
     setup_auth()
-    
-    zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
-    advertise_service(zeroconf, 5000)
-    browse_services(zeroconf)
     
     app.run(host='0.0.0.0', port=5000, threaded=False)
