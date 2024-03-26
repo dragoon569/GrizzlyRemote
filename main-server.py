@@ -1,17 +1,21 @@
 import os
 import ctypes
+import string
+import comtypes
+import random
 import socket
 import json
-import subprocess
 import platform
 import re
 import threading
+import tkinter as tk
+import qrcode
 from flask import Flask, request, render_template, jsonify, redirect, url_for, session
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from comtypes import CLSCTX_ALL
 from ctypes import cast, POINTER
 from flask_httpauth import HTTPBasicAuth
-from zeroconf import IPVersion, ServiceInfo, Zeroconf, ServiceBrowser
+from PIL import Image, ImageTk
 
 app = Flask(__name__,
             template_folder=os.path.join(os.path.dirname(__file__), 'Web'),
@@ -19,53 +23,52 @@ app = Flask(__name__,
 app.secret_key = os.urandom(24)  # Secret key for session management
 auth = HTTPBasicAuth()
 
-CONFIG_FILE = "config.txt"
-SERVICE_TYPE = "_grizzlyremote._tcp.local."
-BEAR_NAME = ""
-volume_control = None
-discovered_peers = []  # List to store discovered peers' information
+# Generate a random code at script start
+random_code = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+
+login_token = random_code
 
 
-def get_bear_name():
-    global BEAR_NAME
-    bear_name = read_config()[0]  # Read bear name from config file
-    if bear_name:
-        BEAR_NAME = bear_name
-    else:
-        BEAR_NAME = input("Name your Bear: ")
-        with open(CONFIG_FILE, "w") as f:
-            f.write(f"{BEAR_NAME}\n")
+def initialize_com():
+    comtypes.CoInitialize()
 
-def get_username_password():
-    username = input("Enter username: ")
-    password = input("Enter password: ")
-    with open(CONFIG_FILE, "a") as f:
-        f.write(f"{username}:{password}\n")
+def get_volume_control():
+    devices = AudioUtilities.GetSpeakers()
+    interface = devices.Activate(
+        IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+    return cast(interface, POINTER(IAudioEndpointVolume))
 
-def read_config():
-    if not os.path.exists(CONFIG_FILE):
-        return None, None, None
-    with open(CONFIG_FILE, "r") as f:
-        lines = f.readlines()
-        bear_name = lines[0].strip()
-        if len(lines) > 1:
-            username, password = lines[1].strip().split(":")
-            return bear_name, username, password
-        else:
-            return bear_name, None, None
+def setup():
+    initialize_com()
+    setup_auth()
 
 def setup_auth():
     if not os.path.exists(CONFIG_FILE):
-        get_bear_name()
-        get_username_password()
+        get_config()
 
-@auth.verify_password
-def verify_password(username, password):
-    if not os.path.exists(CONFIG_FILE):
-        setup_auth()
-    _, stored_username, stored_password = read_config()
-    if username == stored_username and password == stored_password:
-        return username
+def run_flask():
+    app.run(host='0.0.0.0', port=5000, threaded=False)
+
+# Function to generate QR code image
+def generate_qr_code_image(local_ip, port, random_code):
+    login_url = f"http://{local_ip}:{port}/login?code={random_code}"
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(login_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    print("Login URL:", login_url)
+    return img
+
+CONFIG_FILE = "config.txt"
+SERVICE_TYPE = "_grizzlyremote._tcp.local."
+bear_name = ""
+volume_control = None
 
 def get_volume_control():
     devices = AudioUtilities.GetSpeakers()
@@ -114,6 +117,102 @@ def volume_down_5_percent():
     new_volume = max(0.0, current_volume - 0.05)  
     volume_control.SetMasterVolumeLevelScalar(new_volume, None)
 
+def get_config():
+    global bear_name
+    bear_name, username, password = read_config()
+    
+    if bear_name and username and password:
+        return bear_name, username, password
+    
+    if not bear_name:
+        bear_name = input("Name your Bear: ")
+    if not username:
+        username = input("Enter username: ")
+    if not password:
+        password = input("Enter password: ")
+
+    save_config(bear_name, username, password)
+    return bear_name, username, password
+
+def save_config(bear_name, username, password):
+    config_data = {
+        "bearname": {
+            "Bear_Name": bear_name,
+            "Username": username,
+            "Password": password
+        }
+    }
+
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config_data, f, indent=4)
+        input("Setup has been successful, press enter to close")
+
+def read_config():
+    if not os.path.exists(CONFIG_FILE):
+        return None, None, None
+
+    with open(CONFIG_FILE, "r") as f:
+        config_data = json.load(f)
+
+    bear_name = config_data.get("bearname", {}).get("Bear_Name")
+    username = config_data.get("bearname", {}).get("Username")
+    password = config_data.get("bearname", {}).get("Password")
+
+    return bear_name, username, password
+
+@auth.verify_password
+def verify_password(username, password):
+    if not os.path.exists(CONFIG_FILE):
+        setup_auth()
+    _, stored_username, stored_password = read_config()
+    if username == stored_username and password == stored_password:
+        return username
+    
+def run_flask():
+    app.run(host='0.0.0.0', port=5000, threaded=False)
+
+def start_flask_in_thread():
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
+
+def display_tkinter_interface():
+    # Get local IP
+    local_ip = socket.gethostbyname(socket.gethostname())
+    port= 5000
+
+    # Generate QR code
+    qr_code_img = generate_qr_code_image(local_ip, port, random_code)
+    qr_code_img_path = "qr_code.png"
+    qr_code_img.save(qr_code_img_path)
+
+    # Render Tkinter interface
+    root = tk.Tk()
+    root.title("Grizzly Remote")
+    root.geometry("400x400")
+
+    # Set dark theme
+    root.configure(bg="#121212")
+    root.option_add("*TButton*background", "#1E1E1E")
+    root.option_add("*TButton*foreground", "white")
+
+    # Hi 'bear_name' Welcome Back label
+    welcome_label = tk.Label(root, text=f"Hi {bear_name}, Welcome Back", font=("Helvetica", 20), fg="white", bg="#121212")
+    welcome_label.pack(pady=10)
+
+    # QR code display
+    qr_code_img = Image.open(qr_code_img_path)
+    qr_code_img = qr_code_img.resize((200, 200), Image.LANCZOS)
+    qr_code_photo = ImageTk.PhotoImage(qr_code_img)
+    qr_code_label = tk.Label(root, image=qr_code_photo, bg="#121212")
+    qr_code_label.image = qr_code_photo
+    qr_code_label.pack(pady=10)
+
+    # Reminder label
+    reminder_label = tk.Label(root, text="ⓘ Scan this QR code to access your Grizzly remote", font=("Helvetica", 10), fg="gray", bg="#121212")
+    reminder_label.pack(pady=5)
+
+    root.mainloop()
+
 COMMANDS = {
     "turn_screen_off": turn_screen_off,
     "shutdown_computer": shutdown_computer,
@@ -134,84 +233,55 @@ def handle_command(command):
     else:
         print("Invalid command")
 
-def advertise_service(zc, port):
-    global BEAR_NAME
-    desc = {'username': read_config()[1], 'bear_name': BEAR_NAME}  
-    info = ServiceInfo(type_=SERVICE_TYPE,
-                       name=f"{socket.gethostname()}._grizzlyremote._tcp.local.",
-                       server="",
-                       addresses=[socket.inet_pton(socket.AF_INET, socket.gethostbyname(socket.gethostname()))],
-                       port=port,
-                       properties=desc)
-    zc.register_service(info)
-
-def browse_services(zc):
-    class ServiceListener:
-        def __init__(self):
-            pass
-
-        def remove_service(self, zc, type, name):
-            pass
-
-        def add_service(self, zc, type, name):
-            info = zc.get_service_info(type, name)
-            if info:
-                print(f"Discovered service: {name} - {info.addresses[0]}")
-                discovered_peers.append({"name": name, "address": socket.inet_ntoa(info.addresses[0])})
-
-        def update_service(self, zc, type, name):
-            pass
-
-    listener = ServiceListener()
-    browser = ServiceBrowser(zc, SERVICE_TYPE, listener)
-
-def handle_discovery(zc):
-    advertise_service(zc, 5000)  # Advertise own service
-    browse_services(zc)  # Browse for other services
-
-def establish_peer_connections():
-    for peer in discovered_peers:
-        try:
-            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            peer_socket.connect((peer["address"], 5000))  # Connect to peer's service port
-            # Exchange some dummy data with the peer
-            message = "Hello from Grizzly Remote!"
-            peer_socket.sendall(message.encode())
-            response = peer_socket.recv(1024)
-            print(f"Received response from {peer['name']}: {response.decode()}")
-        except Exception as e:
-            print(f"Error connecting to {peer['name']}: {e}")
-        finally:
-            peer_socket.close()
-
-# Thread for handling service discovery and peer connections
-def discovery_and_connection_thread():
-    zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
-    handle_discovery(zeroconf)  # Perform service discovery
-    establish_peer_connections()  # Establish peer connections
-
-# Start the discovery and connection thread
-discovery_thread = threading.Thread(target=discovery_and_connection_thread)
-discovery_thread.start()
-
+@app.route('/get_device_info')
+def get_device_info():
+    try:
+        device_info = {
+            "bear_name": bear_name,
+            "device_name": platform.node(),
+            "device_type": platform.system(),
+            "local_ip": socket.gethostbyname(socket.gethostname())
+        }
+        return jsonify(device_info)
+    except Exception as e:
+        print("Error retrieving device info:", str(e))
+        return jsonify({"error": "An error occurred while retrieving device info"}), 500
+    
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        # Get the username and password from the form data
-        username = request.form['username']
-        password = request.form['password']
-        
-        # Perform authentication logic here
-        if verify_password(username, password):
-            # Authentication successful, store user information in session
-            session['username'] = username
-            return redirect(url_for('home'))  # Redirect to the home page after successful login
+    # ... existing code ...
+    if 'code' in request.args:
+        if auth_token():
+            session['authenticated'] = True  # Set a session variable
+            return redirect(url_for('home'))
         else:
-            # Authentication failed, redirect back to the login page
             return redirect(url_for('login'))
+    
+    else:
+        return render_template('login.html')
 
-    # If the request method is GET or authentication failed, render the login page
-    return render_template('login.html')
+@app.route('/home')
+def home():
+    if 'authenticated' in session:  # Check if the user is authenticated
+        volume = get_master_volume()  
+        return render_template('controlAppHTML.html', volume=volume)
+    else:
+        return redirect(url_for('login'))
+
+
+def auth_token():
+    login_token = random_code # Get the session token
+    code = request.args.get('code')
+
+    print("login_token:", login_token)
+    print("code:", code)
+
+    if login_token == code:
+        print('Success: Authentication successful')
+        return True
+    else:
+        print('Failure: Authentication failed')
+        return False
 
 @app.route('/')
 def baseIndex():
@@ -222,14 +292,6 @@ def get_master_volume_route():
     volume = get_master_volume()
     return str(volume)
 
-
-@app.route('/home')
-def home():
-    if 'username' in session:  # Check if the user is logged in
-        volume = get_master_volume()  
-        return render_template('controlAppHTML.html', volume=volume)
-    else:
-        return redirect(url_for('login'))
 
 @app.route('/get_mute_state')
 def get_mute_state_route():
@@ -254,7 +316,7 @@ from flask import jsonify
 def get_grizzly_info():
     try:
         grizzly_info = {
-            "bear_name": BEAR_NAME,
+            "bear_name": bear_name,
             "device_name": socket.gethostname(),
             "device_type": platform.system(),  
             "local_ip": socket.gethostbyname(socket.gethostname())
@@ -281,8 +343,12 @@ def fetch_grizzly_info():
     return get_grizzly_info()
 
 if __name__ == "__main__":
-    import comtypes
-    comtypes.CoInitialize()  
-    setup_auth()
-    
+    setup()
+    print("Starting Flask in a separate thread...")
+    start_flask_in_thread()
+    print("Displaying Tkinter interface...")
+    tk_thread = threading.Thread(target=display_tkinter_interface)
+    tk_thread.start()
+    print("Flask app is running...")
     app.run(host='0.0.0.0', port=5000, threaded=False)
+

@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
+    
     // Add event listener to volume slider
     var volumeSlider = document.getElementById("volume-slider");
     var volumePercentage = document.getElementById("volume-percentage");
@@ -99,9 +100,6 @@ document.getElementById('mute-unmute-btn').addEventListener('click', function() 
             console.error('There was an error!', error);
         });
     }
-    
-    // Call discoverServices function when the page loads
-    discoverServices();
 
     // Call updateVolumePercentage initially to set the initial volume percentage
     updateVolumePercentage();
@@ -130,11 +128,11 @@ document.getElementById('mute-unmute-btn').addEventListener('click', function() 
 
     // Function to fetch and update Grizzly remote information
     function updateGrizzlyInfo() {
-        fetch("/fetch_grizzly_info") // Fetch the Grizzly remote information from the server
+        fetch("/get_grizzly_info") // Fetch the Grizzly remote information from the server
         .then(response => response.json())
         .then(data => {
             // Update the HTML elements with the fetched information
-            document.getElementById("bear-name").textContent = data.BEAR_NAME;
+            document.getElementById("bear-name").textContent = data.bear_name;
             document.getElementById("device-name").textContent = data.device_name;
             document.getElementById("device-type").textContent = data.device_type;
             document.getElementById("local-ip").textContent = data.local_ip;
