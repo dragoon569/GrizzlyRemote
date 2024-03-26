@@ -175,7 +175,7 @@ def start_flask_in_thread():
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
 
-def display_tkinter_interface():
+def display_tkinter_interface(bear_name):
     # Get local IP
     local_ip = socket.gethostbyname(socket.gethostname())
     port= 5000
@@ -346,8 +346,9 @@ if __name__ == "__main__":
     setup()
     print("Starting Flask in a separate thread...")
     start_flask_in_thread()
+    bear_name, _, _ = get_config()  # Initialize bear_name variable
     print("Displaying Tkinter interface...")
-    tk_thread = threading.Thread(target=display_tkinter_interface)
+    tk_thread = threading.Thread(target=display_tkinter_interface(bear_name))
     tk_thread.start()
     print("Flask app is running...")
     app.run(host='0.0.0.0', port=5000, threaded=False)

@@ -14,7 +14,19 @@ add_firewall_exception(5000)
 
 def install_dependencies():
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "flask", "pycaw", "comtypes", "zeroconf", "flask_httpauth"])
+        subprocess.check_call([
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "flask",
+            "pycaw",
+            "comtypes",
+            "zeroconf",
+            "flask_httpauth",
+            "Pillow",  # Pillow is the Python Imaging Library and is required for working with images (PIL)
+            "qrcode",  # qrcode library for generating QR codes
+        ])
         print("Dependencies installed successfully!")
     except subprocess.CalledProcessError as e:
         print("Error installing dependencies:", e)
