@@ -71,6 +71,7 @@ bear_name = ""
 volume_control = None
 
 def get_volume_control():
+    comtypes.CoInitialize()
     devices = AudioUtilities.GetSpeakers()
     interface = devices.Activate(
         IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
