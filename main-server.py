@@ -1,6 +1,7 @@
 import os
 import ctypes
 import string
+import time
 import comtypes
 import random
 import socket
@@ -10,6 +11,8 @@ import re
 import threading
 import tkinter as tk
 import qrcode
+import tempfile
+from tkinter import filedialog, messagebox
 from flask import Flask, request, render_template, jsonify, redirect, url_for, session
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from comtypes import CLSCTX_ALL
@@ -44,7 +47,7 @@ def setup():
 
 def setup_auth():
     if not os.path.exists(CONFIG_FILE):
-        get_config()
+        display_account_creation_interface()
 
 def run_flask():
     app.run(host='0.0.0.0', port=5000, threaded=False)
@@ -118,36 +121,6 @@ def volume_down_5_percent():
     new_volume = max(0.0, current_volume - 0.05)  
     volume_control.SetMasterVolumeLevelScalar(new_volume, None)
 
-def get_config():
-    global bear_name
-    bear_name, username, password = read_config()
-    
-    if bear_name and username and password:
-        return bear_name, username, password
-    
-    if not bear_name:
-        bear_name = input("Name your Bear: ")
-    if not username:
-        username = input("Enter username: ")
-    if not password:
-        password = input("Enter password: ")
-
-    save_config(bear_name, username, password)
-    return bear_name, username, password
-
-def save_config(bear_name, username, password):
-    config_data = {
-        "bearname": {
-            "Bear_Name": bear_name,
-            "Username": username,
-            "Password": password
-        }
-    }
-
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(config_data, f, indent=4)
-        input("Setup has been successful, press enter to close")
-
 def read_config():
     if not os.path.exists(CONFIG_FILE):
         return None, None, None
@@ -176,10 +149,100 @@ def start_flask_in_thread():
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
 
-def display_tkinter_interface(bear_name):
+def display_account_creation_interface():
+
+    def save_config(bear_name, username, password):
+        config_data = {
+            "bearname": {
+                "Bear_Name": bear_name,
+                "Username": username,
+                "Password": password
+            }
+        }
+
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config_data, f, indent=4)
+        
+        print("Setup has been successful")
+
+    def select_image():
+        nonlocal image_label, bear_name_entry
+        filename = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg;*.jpeg;*.png")])
+        if filename:
+            image = Image.open(filename)
+            image = image.resize((200, 200), Image.LANCZOS)
+            photo = ImageTk.PhotoImage(image)
+            image_label.config(image=photo)
+            image_label.image = photo
+
+        # Save the image with bear's name
+        if bear_name_entry.get():
+            bear_name = bear_name_entry.get()
+            image_path = os.path.join("bears", f"{bear_name}.png")
+            image.save(image_path)
+            print(f"Image saved: {image_path}")
+            return bear_name
+
+    def create_account():
+        nonlocal username_entry, password_entry, bear_name_entry
+        bear_name = bear_name_entry.get()  # Get the text from bear_name_entry
+        username = username_entry.get()    # Get the text from username_entry
+        password = password_entry.get()    # Get the text from password_entry
+        messagebox.showinfo("Account Created", "Your account has been created successfully!")
+        save_config(bear_name, username, password)  # Pass the text values, not the Entry widgets
+        time.sleep(1)
+        root.destroy()  # Close the current window
+        has_config = os.path.exists(CONFIG_FILE)
+        if has_config:
+            display_tkinter_interface(bear_name, has_config)
+
+
+    root = tk.Tk()
+    root.title("Create Account")
+    root.geometry("400x400")
+    root.configure(bg="#121212")
+    root.option_add("*TButton*background", "#1E1E1E")
+    root.option_add("*TButton*foreground", "white")
+
+    account_label = tk.Label(root, text="Create Your Account", font=("Helvetica", 16), fg="white", bg="#121212")
+    account_label.pack(pady=10)
+    
+    select_image_button = tk.Button(root, text="Select Image", command=select_image, bg="#1E1E1E", fg="white")
+    select_image_button.pack(pady=5)
+
+    image_label = tk.Label(root, bg="#121212")
+    image_label.pack(pady=5)
+
+    bear_name_label = tk.Label(root, text="Name of your Bear:", fg="white", bg="#121212")
+    bear_name_label.pack()
+    bear_name_entry = tk.Entry(root)
+    bear_name_entry.pack(pady=5)
+
+    username_label = tk.Label(root, text="Username:", fg="white", bg="#121212")
+    username_label.pack()
+    username_entry = tk.Entry(root)
+    username_entry.pack(pady=5)
+
+    password_label = tk.Label(root, text="Password:", fg="white", bg="#121212")
+    password_label.pack()
+    password_entry = tk.Entry(root, show="*")
+    password_entry.pack(pady=5)
+
+    create_account_button = tk.Button(root, text="Create Account", command=create_account, bg="#1E1E1E", fg="white")
+    create_account_button.pack(pady=10)
+
+
+    root.mainloop()
+
+def display_tkinter_interface(bear_name, has_config):
+
+    if not has_config:
+        # If there's no config file, display account creation interface
+        display_account_creation_interface()
+    else:
     # Get local IP
-    local_ip = socket.gethostbyname(socket.gethostname())
-    port= 5000
+        local_ip = socket.gethostbyname(socket.gethostname())
+        port= 5000
 
     # Generate QR code
     qr_code_img = generate_qr_code_image(local_ip, port, random_code)
@@ -344,13 +407,12 @@ def fetch_grizzly_info():
     return get_grizzly_info()
 
 if __name__ == "__main__":
-    setup()
+    has_config = os.path.exists(CONFIG_FILE)
     print("Starting Flask in a separate thread...")
     start_flask_in_thread()
-    bear_name, _, _ = get_config()  # Initialize bear_name variable
+    bear_name, _, _ = read_config()  # Initialize bear_name variable
     print("Displaying Tkinter interface...")
-    tk_thread = threading.Thread(target=display_tkinter_interface(bear_name))
-    tk_thread.start()
+    display_tkinter_interface(bear_name, has_config)
     print("Flask app is running...")
     app.run(host='0.0.0.0', port=5000, threaded=False)
 

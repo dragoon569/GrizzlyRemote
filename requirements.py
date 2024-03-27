@@ -1,5 +1,4 @@
 import subprocess
-import sys
 import os
 
 def add_firewall_exception(port):
@@ -12,25 +11,21 @@ def add_firewall_exception(port):
 # Call this function with the port your Flask app is running on
 add_firewall_exception(5000)
 
-def install_dependencies():
-    try:
-        subprocess.check_call([
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "flask",
-            "pycaw",
-            "comtypes",
-            "zeroconf",
-            "flask_httpauth",
-            "Pillow",  # Pillow is the Python Imaging Library and is required for working with images (PIL)
-            "qrcode",  # qrcode library for generating QR codes
-        ])
-        print("Dependencies installed successfully!")
-    except subprocess.CalledProcessError as e:
-        print("Error installing dependencies:", e)
-        sys.exit(1)
+
+def install(package):
+    os.system(f"pip install {package}")
+
+libraries = [
+    "comtypes",
+    "qrcode",
+    "flask",
+    "pycaw",
+    "flask_httpauth",
+    "PIL"
+]
+
+for library in libraries:
+    install(library)
 
 def print_bear_art():
     os.system("cls")
@@ -39,7 +34,7 @@ def print_bear_art():
 
 if __name__ == "__main__":
     print("Installing dependencies...")
-    install_dependencies()
+    install(libraries)
     print_bear_art()
 
     # Wait for any key press to continue
