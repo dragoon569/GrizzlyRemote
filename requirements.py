@@ -21,7 +21,7 @@ libraries = [
     "flask",
     "pycaw",
     "flask_httpauth",
-    "PIL"
+    "Pillow"
 ]
 
 for library in libraries:
