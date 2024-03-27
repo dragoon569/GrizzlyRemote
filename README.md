@@ -18,7 +18,7 @@ Dependencies:
 
 Usage:
 
-    Install the dependencies by running pip install -r requirements.txt.
+    Install the dependencies by running the setup.bat
     Start the server by running python main-server.py.
     Access the server endpoints to control various system functions remotely.
 
